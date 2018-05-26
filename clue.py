@@ -40,7 +40,7 @@ class ClueGame(object):
             self._known.append(what)
 
         def __str__(self):
-            return "User({0})".format(self._name)
+            return "{0}".format(self._name)
 
     def __init__(self, chat_id, group_name, tools = None, rooms = None):
         self._chat_id = chat_id
@@ -110,12 +110,12 @@ class ClueGame(object):
 
     def suggest(self, user_id, suspect, tool, room):
         if (tool, room, suspect) == self._murder_info:
-            return -1, []
+            return None, []
         current_index = self._game_order.index(user_id)
         suggestion = set((suspect, tool, room))
 
         for i in range(len(self._game_order)):
-            j = (i + current_index) % len(self._game_order)
+            j = (1 + i + current_index) % len(self._game_order)
             user = self._users[self._game_order[j]]
             intersection = suggestion.intersection(set(user.deck))
             if len(intersection) > 0:
