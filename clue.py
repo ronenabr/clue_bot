@@ -1,10 +1,20 @@
-
-
-ROOMS = ["Kitchen", "Bedroom", "Library", "Dining room"]
-TOOLS = ["Club", "Secers", "Chair"]
-import random 
+import random
 from enum import Enum
+from time import time
+from datetime import timedelta
 
+
+ROOMS = ["Leaving Room", "Bedroom", "Library", "Dining room"]
+TOOLS = ["GARNERA",
+         "OTTIL",
+         "LAGRAD",
+         "FJÄLLA",
+         "TVÄRS",
+         "AVSIKTLIG",
+         "VARDAGEN",
+         "GUBBRÖRA"]
+
+SUSPECTS = ["Ronen", "Oded", "Fox", "Frorixh"]
 
 class ClueGame(object):
 
@@ -15,11 +25,17 @@ class ClueGame(object):
         OK = 100
 
     class User(object) :
+
+        NUMBER_OF_SECONDS_BETWEEN_TURNS = 5 * 60
+
         def __init__(self, id, name):
             self._id = id
             self._name = name
             self._deck = []
+            self._playing = True
             self._known = []
+            self._last_token_given = 0
+            self._prev_time = 0
 
         @property
         def id(self):
@@ -33,11 +49,32 @@ class ClueGame(object):
         def deck(self):
             return self._deck
 
+        @property
+        def can_play(self):
+            if not self._playing:
+                return False
+
+            if time() - self._last_token_given > self.NUMBER_OF_SECONDS_BETWEEN_TURNS:
+                self._prev_time = self._last_token_given
+                self._last_token_given = time()
+                return True
+
+            return False
+
+        def time_to_wait(self):
+            return timedelta(seconds=self.NUMBER_OF_SECONDS_BETWEEN_TURNS - (time() - self._last_token_given))
+
+        def cancel_guess(self):
+            self._last_token_given = self._prev_time
+
         def set_deck(self, deck):
             self._deck = deck
         
         def tell(self, what):
             self._known.append(what)
+
+        def losing(self):
+            self._playing = False
 
         def __str__(self):
             return "{0}".format(self._name)
@@ -52,6 +89,7 @@ class ClueGame(object):
         self._rooms = rooms
         if rooms is None:
             self._rooms = ROOMS
+        self._default_suspects = SUSPECTS
 
         self._users = {}
         self._suggestions = ()
@@ -73,7 +111,8 @@ class ClueGame(object):
             return self.state
 
         # For now, I do not necceserly wants the list of suspects to overlap list of users.
-        self._suspects = [str(self._users[k]) for k in self._users.keys()]
+        # self._suspects = [str(self._users[k]) for k in self._users.keys()]
+        self._suspects = self._default_suspects
         print(self._tools)
 
         self._murder_info = (random.choice(self._tools), random.choice(self._rooms), random.choice(self._suspects))

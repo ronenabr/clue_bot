@@ -73,7 +73,7 @@ def intro(bot, update):
         return
 
     bot.send_message(chat_id=update.message.chat_id, text="Hello everybody. Welcome to `THE CLUE`. Please everybody say /hi")
-
+    #bot.send_photo(chat_id=update.message.chat_id, photo=open("img.png", "rb"))
     group_name = update.message.chat.title
 
     games[chat_id] = ClueGame(chat_id, group_name)
@@ -119,6 +119,7 @@ class ChooseState(IntEnum):
 @user_only
 def guess_cancel(game, user_id, bot, update, user_data):
     user_data.clear()
+    game.get_user(user_id).cancel_guess()
     
     update.message.reply_text(
         "Cancel choice")
@@ -127,6 +128,11 @@ def guess_cancel(game, user_id, bot, update, user_data):
 
 @user_only
 def guess_or_accuse(game, user_id, bot, update):
+    if not game.get_user(user_id).can_play:
+        update.message.reply_text(
+            "You can not play right now. You have to wait {time}".format(time=str(game.get_user(user_id).time_to_wait())))
+        return ConversationHandler.END
+
     reply_keyboard = [['Suggest', "Accuse"], ["Cancel"]]
     markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
 
@@ -136,6 +142,14 @@ def guess_or_accuse(game, user_id, bot, update):
 
     return ChooseState.PLAYER
 
+
+def list_to_list_set(l):
+    l_set = []
+    for i in range(0, len(l), 3):
+        l_set.append(l[i:i+3])
+    return l_set
+
+
 @user_only
 def guess_person(game, user_id, bot, update, user_data):
     text = update.message.text
@@ -143,7 +157,7 @@ def guess_person(game, user_id, bot, update, user_data):
         return guess_cancel(bot, update, user_data)
     user_data["type"]  = text
     print(user_data)
-    reply_keyboard = [[str(u) for u in game._suspects], ["Cancel"]]
+    reply_keyboard = [*list_to_list_set([str(u) for u in game._suspects]), ["Cancel"]]
     markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
 
     update.message.reply_text(
@@ -160,7 +174,7 @@ def guess_tool(game, user_id, bot, update, user_data):
     user_data["player"] = text
     print(user_data)
 
-    reply_keyboard = [game._tools, ["Cancel"]]
+    reply_keyboard = [*list_to_list_set(game._tools), ["Cancel"]]
     markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
 
     update.message.reply_text(
@@ -177,7 +191,7 @@ def guess_room(game, user_id, bot, update, user_data):
     user_data["tool"] = text
     print(user_data)
 
-    reply_keyboard = [game._rooms, ["Cancel"]]
+    reply_keyboard = [*list_to_list_set(game._rooms), ["Cancel"]]
     markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
 
     update.message.reply_text(
@@ -195,7 +209,7 @@ def guess_final(game, user_id, bot, update, user_data):
     print(user_data)
 
     update.message.reply_text(
-        "Choise have been done! ")
+        "Choice has been made! ")
 
     suggestor = game.get_user(user_id)
 
@@ -207,7 +221,7 @@ def guess_final(game, user_id, bot, update, user_data):
                          text="%s has suggested: %s, %s, %s " % (suggestor.name, user_data["player"],
                      user_data["tool"], user_data["room"]))
 
-        if who_will_show is not None:
+        if who_will_show is not None and who_will_show != suggestor:
             reply_keyboard = [["Show: " + w for w in list(what)]]
             markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
             bot.send_message(chat_id=who_will_show.id,
@@ -230,7 +244,7 @@ def guess_final(game, user_id, bot, update, user_data):
         else:
             bot.send_message(chat_id=game._chat_id,
                          text="%s has LOST!!" % (suggestor.name))
-            game._users[user_id]
+            game._users[user_id].losing()
 
     return ConversationHandler.END
 
@@ -245,14 +259,20 @@ def show_card(game, user_id, bot, update, user_data):
     bot.send_message(chat_id=game._chat_id,
                      text="%s has shown %s a card" % (user.name, other_user.name))
 
+@user_only
+def show_my_cards(game, user_id, bot, update):
+    user = game.get_user(user_id)
+    bot.send_message(chat_id=user.id, text="Your cards are \n %s" % "\n\t".join(user.deck))
 
 @group_only
 def endgame(bot, update):
-    pass #TODO: implement
+    pass  # TODO: implement
+
 
 dispatcher.add_handler(CommandHandler('intro', intro))
 dispatcher.add_handler(CommandHandler('hi', register_user))
 dispatcher.add_handler(CommandHandler('kill', make_murder))
+dispatcher.add_handler(CommandHandler('cards', show_my_cards))
 
 dispatcher.add_handler(RegexHandler('^Show: ', show_card, pass_user_data=True))
 
