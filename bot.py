@@ -1,17 +1,23 @@
 from telegram.ext import Updater, CommandHandler, ConversationHandler, RegexHandler, Filters, MessageHandler
 from telegram import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.error import TimedOut
+import time
 from enum import IntEnum
+
 
 import logging
 import random
+import os
 
 from clue import ClueGame
+import cards
 
 
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  level=logging.INFO)
 
-server_updater = Updater(token='507313417:AAGRTVRJJ6hA_c_TXZzM-x3bIz4jNV-MWqA')
+server_updater = Updater(token='507313417:AAGRTVRJJ6hA_c_TXZzM-x3bIz4jNV-MWqA',
+                         request_kwargs=dict(connect_timeout=15.0, read_timeout=20,con_pool_size=5))
 dispatcher = server_updater.dispatcher
 
 
@@ -64,6 +70,19 @@ def test(bot, update):
 dispatcher.add_handler(CommandHandler('test', test))
 
 
+def send_card(bot, chat_id, card):
+
+    file_uploaded = False
+    while file_uploaded == False:
+        try:
+            bot.send_photo(chat_id=chat_id, **card.send_photo())
+            file_uploaded = True
+        except TimedOut:
+            print("Timeout exceeded for %s. Retry" % card.name)
+            time.sleep(0.5)
+
+
+
 def intro(bot, update):
     user_id = update.effective_user.id
     chat_id = update.message.chat_id
@@ -72,12 +91,19 @@ def intro(bot, update):
         bot.send_message(chat_id=update.message.chat_id, text="You can post this command only from game group")
         return
 
-    bot.send_message(chat_id=update.message.chat_id, text="Hello everybody. Welcome to `THE CLUE`. Please everybody say /hi")
-    #bot.send_photo(chat_id=update.message.chat_id, photo=open("img.png", "rb"))
+    bot.send_message(chat_id=update.message.chat_id, text="Please wait while I'm setting up the game")
+
+
+    #msg = bot.send_photo(chat_id=update.message.chat_id, photo=open("img.png", "rb"), caption="foo bar")
     group_name = update.message.chat.title
 
-    games[chat_id] = ClueGame(chat_id, group_name)
+    cards_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "images")
+    game_cards = cards.directory_initilizer(cards_dir, bot, user_id)
+    games[chat_id] = ClueGame(chat_id, group_name, **game_cards)
     user_to_game[user_id] = games[chat_id]
+
+    bot.send_message(chat_id=update.message.chat_id, text="Hello everybody. Welcome to `THE CLUE`. Please everybody say /hi")
+
 
 
 @group_only
@@ -93,10 +119,20 @@ def register_user(game, bot, update):
 def make_murder(game, bot, update):
     game.start_game()
 
-    text = "Someone commited a murder! Alas! \nHe used one of the follwing tools:\n\t\t{0} \n" \
-    "It was in room:\n\t\t{1} \n" \
-    "And the murdrer might be...\n\t\t{2}".format("\n\t\t".join(game._tools),"\n\t\t".join(game._rooms),"\n\t\t".join([str(u) for u in game._suspects]))
-    bot.send_message(chat_id=update.message.chat_id, text=text)
+    text1 = "Someone commited a murder! Alas! \nHe used one of the follwing tools: "
+    text2 = "It was in room:  "
+    text3 = "And the murdrer might be... "
+
+    bot.send_message(chat_id=update.message.chat_id, text=text1)
+    # [send_card(bot, update.message.chat_id, c) for c in game._tools]
+
+    bot.send_message(chat_id=update.message.chat_id, text=text2)
+    # [send_card(bot, update.message.chat_id, c) for c in game._rooms]
+
+    bot.send_message(chat_id=update.message.chat_id, text=text3)
+    # [send_card(bot, update.message.chat_id, c) for c in game._suspects]
+
+
     bot.send_message(chat_id=update.message.chat_id, text="In order to guess, send me /guess privatly.")
 
 @user_only
@@ -146,7 +182,7 @@ def guess_or_accuse(game, user_id, bot, update):
 def list_to_list_set(l):
     l_set = []
     for i in range(0, len(l), 3):
-        l_set.append(l[i:i+3])
+        l_set.append(map(str, l[i:i+3]))
     return l_set
 
 
@@ -157,7 +193,7 @@ def guess_person(game, user_id, bot, update, user_data):
         return guess_cancel(bot, update, user_data)
     user_data["type"]  = text
     print(user_data)
-    reply_keyboard = [*list_to_list_set([str(u) for u in game._suspects]), ["Cancel"]]
+    reply_keyboard = [*list_to_list_set(game._suspects), ["Cancel"]]
     markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
 
     update.message.reply_text(
@@ -220,13 +256,18 @@ def guess_final(game, user_id, bot, update, user_data):
         bot.send_message(chat_id=game._chat_id,
                          text="%s has suggested: %s, %s, %s " % (suggestor.name, user_data["player"],
                      user_data["tool"], user_data["room"]))
+        import ipdb; ipdb.set_trace()
+        if who_will_show is not None
+            if who_will_show != suggestor:
+                reply_keyboard = [["Show: " + w for w in list(what)]]
+                markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
+                bot.send_message(chat_id=who_will_show.id,
+                                 text="Please choose card to show", reply_markup=markup)
+                dispatcher.user_data[who_will_show.id]["show_to"] = user_id
+            else:
+                bot.send_message(chat_id=suggestor.id,
+                                 text="No one have cards to show you.")
 
-        if who_will_show is not None and who_will_show != suggestor:
-            reply_keyboard = [["Show: " + w for w in list(what)]]
-            markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
-            bot.send_message(chat_id=who_will_show.id,
-                             text="Please choose card to show", reply_markup=markup)
-            dispatcher.user_data[who_will_show.id]["show_to"] = user_id
 
     if user_data["type"] == "Accuse":
         res = game.accuse(user_data["player"],
@@ -262,7 +303,30 @@ def show_card(game, user_id, bot, update, user_data):
 @user_only
 def show_my_cards(game, user_id, bot, update):
     user = game.get_user(user_id)
-    bot.send_message(chat_id=user.id, text="Your cards are \n %s" % "\n\t".join(user.deck))
+    bot.send_message(chat_id=user.id, text="Your cards are \n")
+    for c in user.deck:
+        send_card(bot,user_id,c)
+
+
+@user_only
+def show_me_rooms(game, user_id, bot, update):
+    bot.send_message(chat_id=user_id, text="Possible rooms are \n")
+    for c in game._rooms:
+        send_card(bot,user_id,c)
+
+
+@user_only
+def show_me_suspecs(game, user_id, bot, update):
+    bot.send_message(chat_id=user_id, text="Possible suspects are \n")
+    for c in game._suspects:
+        send_card(bot,user_id,c)
+
+
+@user_only
+def show_me_tools(game, user_id, bot, update):
+    bot.send_message(chat_id=user_id, text="Possible rooms are \n")
+    for c in game._tools:
+        send_card(bot,user_id,c)
 
 @group_only
 def endgame(bot, update):
@@ -273,6 +337,11 @@ dispatcher.add_handler(CommandHandler('intro', intro))
 dispatcher.add_handler(CommandHandler('hi', register_user))
 dispatcher.add_handler(CommandHandler('kill', make_murder))
 dispatcher.add_handler(CommandHandler('cards', show_my_cards))
+
+dispatcher.add_handler(CommandHandler('suspects', show_me_suspecs))
+dispatcher.add_handler(CommandHandler('tools', show_me_tools))
+dispatcher.add_handler(CommandHandler('rooms', show_me_rooms))
+
 
 dispatcher.add_handler(RegexHandler('^Show: ', show_card, pass_user_data=True))
 

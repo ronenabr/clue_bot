@@ -3,7 +3,6 @@ from enum import Enum
 from time import time
 from datetime import timedelta
 
-
 ROOMS = ["Leaving Room", "Bedroom", "Library", "Dining room"]
 TOOLS = ["GARNERA",
          "OTTIL",
@@ -16,15 +15,15 @@ TOOLS = ["GARNERA",
 
 SUSPECTS = ["Ronen", "Oded", "Fox", "Frorixh"]
 
-class ClueGame(object):
 
+class ClueGame(object):
     class Status(Enum):
         Init = 1
         Running = 2
         Ended = 3
         OK = 100
 
-    class User(object) :
+    class User(object):
 
         NUMBER_OF_SECONDS_BETWEEN_TURNS = 5 * 60
 
@@ -69,7 +68,7 @@ class ClueGame(object):
 
         def set_deck(self, deck):
             self._deck = deck
-        
+
         def tell(self, what):
             self._known.append(what)
 
@@ -79,7 +78,7 @@ class ClueGame(object):
         def __str__(self):
             return "{0}".format(self._name)
 
-    def __init__(self, chat_id, group_name, tools = None, rooms = None):
+    def __init__(self, chat_id, group_name, tools=None, rooms=None, suspects=None):
         self._chat_id = chat_id
         self.group_name = group_name
         self.state = ClueGame.Status.Init
@@ -89,7 +88,7 @@ class ClueGame(object):
         self._rooms = rooms
         if rooms is None:
             self._rooms = ROOMS
-        self._default_suspects = SUSPECTS
+        self._default_suspects = suspects
 
         self._users = {}
         self._suggestions = ()
@@ -99,7 +98,7 @@ class ClueGame(object):
         self._deck = []
         self._game_order = []
         self.current_index = 0
-        
+
     def register_user(self, user_id, name):
         if self.state == ClueGame.Status.Init:
             self._users[user_id] = ClueGame.User(user_id, name)
@@ -121,19 +120,19 @@ class ClueGame(object):
         self._deck.extend([t for t in self._tools if t != self._murder_info[0]])
         self._deck.extend([t for t in self._rooms if t != self._murder_info[1]])
         self._deck.extend([t for t in self._suspects if t != self._murder_info[2]])
-        
+
         random.shuffle(self._deck)
-        cards_per_user = len(self._deck)//len(self._users)
-        extra_cards = len(self._deck)%len(self._users)
+        cards_per_user = len(self._deck) // len(self._users)
+        extra_cards = len(self._deck) % len(self._users)
         print(cards_per_user, extra_cards, len(self._users))
         deck_index = 0
         for i, (_, u) in enumerate(self._users.items()):
-            extra_card =  1 if extra_cards > i else 0
+            extra_card = 1 if extra_cards > i else 0
             deck_offset = deck_index + cards_per_user + extra_card
-            print(deck_offset-deck_index)
+            print(deck_offset - deck_index)
             u.set_deck(self._deck[deck_index:deck_offset])
             deck_index = deck_offset
-        
+
         self._game_order = list(self._users.keys())
         random.shuffle(self._game_order)
         self.current_index = 0
@@ -159,12 +158,12 @@ class ClueGame(object):
             intersection = suggestion.intersection(set(user.deck))
             if len(intersection) > 0:
                 return user, list(intersection)
-            
+
         print("Something bad has happend")
         return None, []
-    
+
     def tell(self, who, to, what):
-        #check
+        # check
         if not what in who._deck:
             print("Some error with {0} telling {1}".format(who, what))
         to.tell(what)
@@ -175,7 +174,7 @@ class ClueGame(object):
             return None
         self.current_index += 1
         user = self._users[self._game_order[self.current_index]]
-    
+
         return user
 
     def get_user(self, uid):
