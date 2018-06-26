@@ -115,25 +115,40 @@ def register_user(game, bot, update):
 
     game.register_user(uid, fullname)
 
+instruction_text = """
+How to play?
+========
+
+All the commands should be send to me, your lovely bot privately.   You can ask me...
+
+ • Type `/cards`  to see the cards your are holding
+ • If you will ask me for `/suspects`, I'll remind you who was here while the murder was committed.
+ • Ask for  `/weapons` to see which items we found around here. 
+ what different rooms we have in our house.
+ • And finally, I can list for you the `/rooms` we have around here. 
+ • If you think you know Who, Where and with what the murder was done, you can always `/guess`.
+ • And finally, I can remind you these instructions if you ask for `/help`. 
+
+"""
+
 @group_only
 def make_murder(game, bot, update):
     game.start_game()
 
-    text1 = "Someone commited a murder! Alas! \nHe used one of the follwing tools: "
-    text2 = "It was in room:  "
-    text3 = "And the murdrer might be... "
+    text1 = "Someone commited a murder! Alas! \nHe used one of the following tools: \n\t\t%s "
+    text2 = "It was in room:  \n\t\t%s"
+    text3 = "And the murdrer might be... \n\t\t%s"
 
-    bot.send_message(chat_id=update.message.chat_id, text=text1)
-    # [send_card(bot, update.message.chat_id, c) for c in game._tools]
+    bot.send_message(chat_id=update.message.chat_id, text=text1 % "\n\t\t".join(map(str,game._tools)))
 
-    bot.send_message(chat_id=update.message.chat_id, text=text2)
-    # [send_card(bot, update.message.chat_id, c) for c in game._rooms]
+    bot.send_message(chat_id=update.message.chat_id, text=text2 % "\n\t\t".join(map(str,game._rooms)))
 
-    bot.send_message(chat_id=update.message.chat_id, text=text3)
-    # [send_card(bot, update.message.chat_id, c) for c in game._suspects]
+    bot.send_message(chat_id=update.message.chat_id, text=text3 % "\n\t\t".join(map(str,game._suspects)))
 
-
-    bot.send_message(chat_id=update.message.chat_id, text="In order to guess, send me /guess privately.")
+    bot.send_message(chat_id=update.message.chat_id, text=instruction_text)
+    bot.send_message(chat_id=update.message.chat_id,
+                     text="You can address me at %s. \nPlease ask me for /cards now."
+                          "(Privately. You don't won't everybody to see) " % bot.name)
 
 @user_only
 def get_cards(game, user_id,  bot, update):
@@ -256,8 +271,8 @@ def guess_final(game, user_id, bot, update, user_data):
         bot.send_message(chat_id=game._chat_id,
                          text="%s has suggested: %s, %s, %s " % (suggestor.name, user_data["player"],
                      user_data["tool"], user_data["room"]))
-        import ipdb; ipdb.set_trace()
-        if who_will_show is not None
+
+        if who_will_show is not None:
             if who_will_show != suggestor:
                 reply_keyboard = [["Show: " + w for w in list(what)]]
                 markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
@@ -267,7 +282,6 @@ def guess_final(game, user_id, bot, update, user_data):
             else:
                 bot.send_message(chat_id=suggestor.id,
                                  text="No one has a card to show you.")
-
 
     if user_data["type"] == "Accuse":
         res = game.accuse(user_data["player"],
@@ -324,13 +338,17 @@ def show_me_suspecs(game, user_id, bot, update):
 
 @user_only
 def show_me_tools(game, user_id, bot, update):
-    bot.send_message(chat_id=user_id, text="Possible WEAPONS are \n")
+    bot.send_message(chat_id=user_id, text="Possible weapons are \n")
     for c in game._tools:
         send_card(bot,user_id,c)
 
 @group_only
 def endgame(bot, update):
     pass  # TODO: implement
+
+@user_only
+def get_help(game, user_id,  bot, update):
+    bot.send_message(chat_id=user_id, text=instruction_text)
 
 
 dispatcher.add_handler(CommandHandler('intro', intro))
@@ -341,6 +359,8 @@ dispatcher.add_handler(CommandHandler('cards', show_my_cards))
 dispatcher.add_handler(CommandHandler('suspects', show_me_suspecs))
 dispatcher.add_handler(CommandHandler('weapons', show_me_tools))
 dispatcher.add_handler(CommandHandler('rooms', show_me_rooms))
+
+dispatcher.add_handler(CommandHandler('help', get_help))
 
 
 dispatcher.add_handler(RegexHandler('^Show: ', show_card, pass_user_data=True))
