@@ -133,12 +133,12 @@ def make_murder(game, bot, update):
     # [send_card(bot, update.message.chat_id, c) for c in game._suspects]
 
 
-    bot.send_message(chat_id=update.message.chat_id, text="In order to guess, send me /guess privatly.")
+    bot.send_message(chat_id=update.message.chat_id, text="In order to guess, send me /guess privately.")
 
 @user_only
 def get_cards(game, user_id,  bot, update):
     if game.state != ClueGame.Status.Running:
-        update.message.reply_text("Can not get cards before game starts")
+        update.message.reply_text("Can't get cards before game starts")
         return
     user = game.get_user(user_id)
     update.message.reply_text("Your cards are \n %s" % "\n\t".join(user.deck))
@@ -166,7 +166,7 @@ def guess_cancel(game, user_id, bot, update, user_data):
 def guess_or_accuse(game, user_id, bot, update):
     if not game.get_user(user_id).can_play:
         update.message.reply_text(
-            "You can not play right now. You have to wait {time}".format(time=str(game.get_user(user_id).time_to_wait())))
+            "You can't play right now. Please wait {time}".format(time=str(game.get_user(user_id).time_to_wait())))
         return ConversationHandler.END
 
     reply_keyboard = [['Suggest', "Accuse"], ["Cancel"]]
@@ -197,7 +197,7 @@ def guess_person(game, user_id, bot, update, user_data):
     markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
 
     update.message.reply_text(
-        "Please choose the player commited murder",
+        "Please choose the murderer",
         reply_markup=markup)
 
     return ChooseState.TOOL
@@ -214,7 +214,7 @@ def guess_tool(game, user_id, bot, update, user_data):
     markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
 
     update.message.reply_text(
-        "Please choose the tool of murder",
+        "Please choose the murder weapon",
         reply_markup=markup)
 
     return ChooseState.ROOM
@@ -231,7 +231,7 @@ def guess_room(game, user_id, bot, update, user_data):
     markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
 
     update.message.reply_text(
-        "Please choose the room where the murder as commited",
+        "Please choose the room where the murder was committed",
         reply_markup=markup)
 
     return ChooseState.FINAL
@@ -245,7 +245,7 @@ def guess_final(game, user_id, bot, update, user_data):
     print(user_data)
 
     update.message.reply_text(
-        "Choice has been made! ")
+        "Your choice has been made! ")
 
     suggestor = game.get_user(user_id)
 
@@ -262,11 +262,11 @@ def guess_final(game, user_id, bot, update, user_data):
                 reply_keyboard = [["Show: " + w for w in list(what)]]
                 markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
                 bot.send_message(chat_id=who_will_show.id,
-                                 text="Please choose card to show", reply_markup=markup)
+                                 text="Please choose a card to show", reply_markup=markup)
                 dispatcher.user_data[who_will_show.id]["show_to"] = user_id
             else:
                 bot.send_message(chat_id=suggestor.id,
-                                 text="No one have cards to show you.")
+                                 text="No one has a card to show you.")
 
 
     if user_data["type"] == "Accuse":
@@ -281,10 +281,10 @@ def guess_final(game, user_id, bot, update, user_data):
 
         if res:
             bot.send_message(chat_id=game._chat_id,
-                         text="%s has WON!!" % (suggestor.name))
+                         text="%s has WON THE GAME!!!" % (suggestor.name))
         else:
             bot.send_message(chat_id=game._chat_id,
-                         text="%s has LOST!!" % (suggestor.name))
+                         text="%s has LOST and is removed from the game!" % (suggestor.name))
             game._users[user_id].losing()
 
     return ConversationHandler.END
@@ -317,14 +317,14 @@ def show_me_rooms(game, user_id, bot, update):
 
 @user_only
 def show_me_suspecs(game, user_id, bot, update):
-    bot.send_message(chat_id=user_id, text="Possible suspects are \n")
+    bot.send_message(chat_id=user_id, text="The Suspects are \n")
     for c in game._suspects:
         send_card(bot,user_id,c)
 
 
 @user_only
 def show_me_tools(game, user_id, bot, update):
-    bot.send_message(chat_id=user_id, text="Possible rooms are \n")
+    bot.send_message(chat_id=user_id, text="Possible WEAPONS are \n")
     for c in game._tools:
         send_card(bot,user_id,c)
 
@@ -339,7 +339,7 @@ dispatcher.add_handler(CommandHandler('kill', make_murder))
 dispatcher.add_handler(CommandHandler('cards', show_my_cards))
 
 dispatcher.add_handler(CommandHandler('suspects', show_me_suspecs))
-dispatcher.add_handler(CommandHandler('tools', show_me_tools))
+dispatcher.add_handler(CommandHandler('weapons', show_me_tools))
 dispatcher.add_handler(CommandHandler('rooms', show_me_rooms))
 
 
