@@ -5,6 +5,8 @@ import time
 from enum import IntEnum
 
 
+from bot_token import bot_token
+
 import logging
 import random
 import os
@@ -13,10 +15,9 @@ from clue import ClueGame
 import cards
 
 
-
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  level=logging.INFO)
 
-server_updater = Updater(token='507313417:AAGRTVRJJ6hA_c_TXZzM-x3bIz4jNV-MWqA',
+server_updater = Updater(token=bot_token,
                          request_kwargs=dict(connect_timeout=15.0, read_timeout=20,con_pool_size=5))
 dispatcher = server_updater.dispatcher
 
