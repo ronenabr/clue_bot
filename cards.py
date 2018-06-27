@@ -62,6 +62,7 @@ def subdir_initilizer(subdir, type, bot, user_id):
     for item in os.listdir(subdir):
         if item[-4:].lower() in [".jpg", ".png", ".gif"]:
             path = os.path.join(subdir, item)
+            print(path, filenames)
             if path in filenames:
                 continue
             name = item[:-4]

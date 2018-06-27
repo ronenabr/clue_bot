@@ -18,8 +18,8 @@ TOOLS = ["GARNERA",
 
 SUSPECTS = ["Ronen", "Oded", "Fox", "Frorixh"]
 
-NUMBER_OF_SECONDS_BETWEEN_TURNS = 0.5 * 60
-GUESS_TIMEOUT_TIME = 0.5*60;
+NUMBER_OF_SECONDS_BETWEEN_TURNS = 0.1 * 60
+GUESS_TIMEOUT_TIME = 0.1*60;
 
 class ClueGame(object):
     class Status(Enum):
@@ -68,11 +68,11 @@ class ClueGame(object):
                 return False
 
         def time_to_wait(self):
-            # with self._lock:
+            with self._lock:
                 return timedelta(seconds=NUMBER_OF_SECONDS_BETWEEN_TURNS - (time() - self._last_token_given))
 
         def cancel_guess(self):
-            # with self._lock:
+            with self._lock:
                 self._last_token_given = self._prev_time
 
         def set_deck(self, deck):
@@ -82,7 +82,7 @@ class ClueGame(object):
             self._known.append(what)
 
         def losing(self):
-            # with self._lock:
+            with self._lock:
                 self._playing = False
 
         def __str__(self):
@@ -216,7 +216,7 @@ class ClueGame(object):
             if len(intersection) > 0:
                 return user, list(intersection)
 
-        print("Something bad has happend")
+        print("Something bad has happened")
         return None, []
 
     def tell(self, who, to, what):
