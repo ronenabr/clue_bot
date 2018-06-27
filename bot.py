@@ -1,14 +1,18 @@
+#!/usr/bin/env python3
+#  -*- coding: utf-8 -*-
+
+
 from telegram.ext import Updater, CommandHandler, ConversationHandler, RegexHandler, Filters, MessageHandler
 from telegram import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.error import TimedOut
 import time
+from datetime import timedelta
 from enum import IntEnum
 
 
 from bot_token import bot_token
 
 import logging
-import random
 import os
 
 from clue import ClueGame
@@ -17,14 +21,10 @@ import cards
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  level=logging.INFO)
 
-server_updater = Updater(token=bot_token,
-                         request_kwargs=dict(connect_timeout=15.0, read_timeout=20,con_pool_size=5))
-dispatcher = server_updater.dispatcher
 
 
 from functools import wraps
 
-BOT_LINK = "http://t.me/clue_test_bot"
 
 games = {}
 user_to_game = {}
@@ -33,6 +33,7 @@ user_to_game = {}
 def group_only(func):
     @wraps(func)
     def wrapped(bot, update, *args, **kwargs):
+        print("group_only")
         user_id = update.effective_user.id
         chat_id = update.message.chat_id
 
@@ -52,13 +53,37 @@ def user_only(func):
         chat_id = update.message.chat_id
 
         if user_id != chat_id:
-            bot.send_message(chat_id=update.message.chat_id, text="In order to post this command you must address the bot directly.\nTry resending in %s" % (BOT_LINK))
+            bot.send_message(chat_id=update.message.chat_id, text="In order to post this command you must address the bot directly.\nTry resending in %s" % (bot.name))
             return
         if user_id not in user_to_game:
             bot.send_message(chat_id=update.message.chat_id, text="No active game for user")
         return func(user_to_game[user_id], user_id, bot, update, *args, **kwargs)
     return wrapped
 
+LIST_OF_ADMINS = None
+def get_admin_ids(bot, chat_id):
+    """Returns a list of admin IDs for a given chat. Results are cached for 1 hour."""
+    admins =  [admin.user.id for admin in bot.get_chat_administrators(chat_id)]
+    print(admins, [admin.user.name for admin in bot.get_chat_administrators(chat_id)])
+    return admins
+
+
+def restricted(func):
+    @wraps(func)
+    def wrapped(bot, update, *args, **kwargs):
+        global  LIST_OF_ADMINS
+
+        if update.message.chat_id == update.effective_user.id:
+            bot.send_message(chat_id=update.message.chat_id, text="You can post this command only from game group")
+            return
+        if LIST_OF_ADMINS is None:
+            LIST_OF_ADMINS = get_admin_ids(bot, update.message.chat_id)
+        user_id = update.effective_user.id
+        if user_id not in LIST_OF_ADMINS:
+            print("Unauthorized access denied for {}.".format(user_id))
+            return
+        return func(bot, update, *args, **kwargs)
+    return wrapped
 
 
 update_history = []
@@ -68,7 +93,6 @@ def test(bot, update):
     print("Starting")
     print([u.message.text for u in updates])    
     bot.send_message(chat_id=update.message.chat_id, text="I'm a bot, please talk to me!")
-dispatcher.add_handler(CommandHandler('test', test))
 
 
 def send_card(bot, chat_id, card):
@@ -81,9 +105,7 @@ def send_card(bot, chat_id, card):
         except TimedOut:
             print("Timeout exceeded for %s. Retry" % card.name)
             time.sleep(0.5)
-
-
-
+@restricted
 def intro(bot, update):
     user_id = update.effective_user.id
     chat_id = update.message.chat_id
@@ -131,7 +153,7 @@ All the commands should be send to me, your lovely bot privately.   You can ask 
  • And finally, I can remind you these instructions if you ask for `/help`. 
 
 """
-
+@restricted
 @group_only
 def make_murder(game, bot, update):
     game.start_game()
@@ -170,6 +192,10 @@ class ChooseState(IntEnum):
 
 @user_only
 def guess_cancel(game, user_id, bot, update, user_data):
+    if not game.cont_guess(user_id):
+        return
+    game.end_guess(user_id)
+
     user_data.clear()
     game.get_user(user_id).cancel_guess()
     
@@ -180,10 +206,16 @@ def guess_cancel(game, user_id, bot, update, user_data):
 
 @user_only
 def guess_or_accuse(game, user_id, bot, update):
+    import ipdb; ipdb.set_trace()
     if not game.get_user(user_id).can_play:
         update.message.reply_text(
             "You can't play right now. Please wait {time}".format(time=str(game.get_user(user_id).time_to_wait())))
         return ConversationHandler.END
+
+    if not game.start_guess(user_id):
+        update.message.reply_text("You can't guess now. Someone else is guessing.")
+        game.get_user(user_id).cancel_guess()
+        return
 
     reply_keyboard = [['Suggest', "Accuse"], ["Cancel"]]
     markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
@@ -204,6 +236,10 @@ def list_to_list_set(l):
 
 @user_only
 def guess_person(game, user_id, bot, update, user_data):
+    if not game.cont_guess(user_id):
+        update.message.reply_text("You can't guess now. Guessing took too long?.")
+        return
+
     text = update.message.text
     if text == "Cancel":
         return guess_cancel(bot, update, user_data)
@@ -220,6 +256,10 @@ def guess_person(game, user_id, bot, update, user_data):
 
 @user_only
 def guess_tool(game, user_id, bot, update, user_data):
+    if not game.cont_guess(user_id):
+        update.message.reply_text("You can't guess now. Guessing took too long?.")
+        return
+
     text = update.message.text
     if text == "Cancel":
         return guess_cancel(bot, update, user_data)
@@ -237,6 +277,10 @@ def guess_tool(game, user_id, bot, update, user_data):
 
 @user_only
 def guess_room(game, user_id, bot, update, user_data):
+    if not game.cont_guess(user_id):
+        update.message.reply_text("You can't guess now. Guessing took too long?.")
+        return
+
     text = update.message.text
     if text == "Cancel":
         return guess_cancel(bot, update, user_data)
@@ -254,6 +298,10 @@ def guess_room(game, user_id, bot, update, user_data):
 
 @user_only
 def guess_final(game, user_id, bot, update, user_data):
+    if not game.cont_guess(user_id):
+        update.message.reply_text("You can't guess now. Guessing took too long?.")
+        return
+
     text = update.message.text
     if text == "Cancel":
         return guess_cancel(bot, update, user_data)
@@ -302,6 +350,7 @@ def guess_final(game, user_id, bot, update, user_data):
                          text="%s has LOST and is removed from the game!" % (suggestor.name))
             game._users[user_id].losing()
 
+    game.end_guess(user_id)
     return ConversationHandler.END
 
 @user_only
@@ -352,32 +401,43 @@ def get_help(game, user_id,  bot, update):
     bot.send_message(chat_id=user_id, text=instruction_text)
 
 
-dispatcher.add_handler(CommandHandler('intro', intro))
-dispatcher.add_handler(CommandHandler('hi', register_user))
-dispatcher.add_handler(CommandHandler('kill', make_murder))
-dispatcher.add_handler(CommandHandler('cards', show_my_cards))
+def set_dispatchr(server_updater):
 
-dispatcher.add_handler(CommandHandler('suspects', show_me_suspecs))
-dispatcher.add_handler(CommandHandler('weapons', show_me_tools))
-dispatcher.add_handler(CommandHandler('rooms', show_me_rooms))
+    dispatcher = server_updater.dispatcher
 
-dispatcher.add_handler(CommandHandler('help', get_help))
+    dispatcher.add_handler(CommandHandler('test', test))
+
+    dispatcher.add_handler(CommandHandler('intro', intro))
+    dispatcher.add_handler(CommandHandler('hi', register_user))
+    dispatcher.add_handler(CommandHandler('kill', make_murder))
+    dispatcher.add_handler(CommandHandler('cards', show_my_cards))
+
+    dispatcher.add_handler(CommandHandler('suspects', show_me_suspecs))
+    dispatcher.add_handler(CommandHandler('weapons', show_me_tools))
+    dispatcher.add_handler(CommandHandler('rooms', show_me_rooms))
+
+    dispatcher.add_handler(CommandHandler('help', get_help))
 
 
-dispatcher.add_handler(RegexHandler('^Show: ', show_card, pass_user_data=True))
+    dispatcher.add_handler(RegexHandler('^Show: ', show_card, pass_user_data=True))
 
 
-conv_handler = ConversationHandler(
-    entry_points=[CommandHandler("guess", guess_or_accuse)],
-    states={
-        ChooseState.PLAYER: [MessageHandler(Filters.text, guess_person, pass_user_data=True)],
-        ChooseState.TOOL: [MessageHandler(Filters.text, guess_tool, pass_user_data=True)],
-        ChooseState.ROOM: [MessageHandler(Filters.text, guess_room, pass_user_data=True)],
-        ChooseState.FINAL: [MessageHandler(Filters.text, guess_final, pass_user_data=True)]
-    },
-    fallbacks=[RegexHandler('^Cancel$', guess_cancel, pass_user_data=True)]
-)
-dispatcher.add_handler(conv_handler)
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("guess", guess_or_accuse)],
+        states={
+            ChooseState.PLAYER: [MessageHandler(Filters.text, guess_person, pass_user_data=True)],
+            ChooseState.TOOL: [MessageHandler(Filters.text, guess_tool, pass_user_data=True)],
+            ChooseState.ROOM: [MessageHandler(Filters.text, guess_room, pass_user_data=True)],
+            ChooseState.FINAL: [MessageHandler(Filters.text, guess_final, pass_user_data=True)]
+        },
+        fallbacks=[RegexHandler('^Cancel$', guess_cancel, pass_user_data=True)]
+    )
+    dispatcher.add_handler(conv_handler)
 
-server_updater.start_polling()
-server_updater.idle()
+
+if __name__ == '__main__':
+    server_updater = Updater(token=bot_token,
+                             request_kwargs=dict(connect_timeout=15.0, read_timeout=20, con_pool_size=5))
+    set_dispatchr(server_updater)
+    server_updater.start_polling()
+    server_updater.idle()

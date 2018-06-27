@@ -1,7 +1,10 @@
+# -*- coding: utf-8 -*-
+
 import random
 from enum import Enum
 from time import time
 from datetime import timedelta
+from threading import Lock
 
 ROOMS = ["Leaving Room", "Bedroom", "Library", "Dining room"]
 TOOLS = ["GARNERA",
@@ -15,6 +18,8 @@ TOOLS = ["GARNERA",
 
 SUSPECTS = ["Ronen", "Oded", "Fox", "Frorixh"]
 
+NUMBER_OF_SECONDS_BETWEEN_TURNS = 0.5 * 60
+GUESS_TIMEOUT_TIME = 0.5*60;
 
 class ClueGame(object):
     class Status(Enum):
@@ -25,9 +30,8 @@ class ClueGame(object):
 
     class User(object):
 
-        NUMBER_OF_SECONDS_BETWEEN_TURNS = 5 * 60
 
-        def __init__(self, id, name):
+        def __init__(self, id, name, game):
             self._id = id
             self._name = name
             self._deck = []
@@ -35,6 +39,8 @@ class ClueGame(object):
             self._known = []
             self._last_token_given = 0
             self._prev_time = 0
+            self._game = game
+            self._lock = Lock()
 
         @property
         def id(self):
@@ -42,7 +48,7 @@ class ClueGame(object):
 
         @property
         def name(self):
-            return self._name
+                return self._name
 
         @property
         def deck(self):
@@ -50,21 +56,24 @@ class ClueGame(object):
 
         @property
         def can_play(self):
-            if not self._playing:
+            # with self._lock:
+                if not self._playing:
+                    return False
+
+                if time() - self._last_token_given > NUMBER_OF_SECONDS_BETWEEN_TURNS:
+                    self._prev_time = self._last_token_given
+                    self._last_token_given = time()
+                    return True
+
                 return False
 
-            if time() - self._last_token_given > self.NUMBER_OF_SECONDS_BETWEEN_TURNS:
-                self._prev_time = self._last_token_given
-                self._last_token_given = time()
-                return True
-
-            return False
-
         def time_to_wait(self):
-            return timedelta(seconds=self.NUMBER_OF_SECONDS_BETWEEN_TURNS - (time() - self._last_token_given))
+            # with self._lock:
+                return timedelta(seconds=NUMBER_OF_SECONDS_BETWEEN_TURNS - (time() - self._last_token_given))
 
         def cancel_guess(self):
-            self._last_token_given = self._prev_time
+            # with self._lock:
+                self._last_token_given = self._prev_time
 
         def set_deck(self, deck):
             self._deck = deck
@@ -73,7 +82,8 @@ class ClueGame(object):
             self._known.append(what)
 
         def losing(self):
-            self._playing = False
+            # with self._lock:
+                self._playing = False
 
         def __str__(self):
             return "{0}".format(self._name)
@@ -99,47 +109,94 @@ class ClueGame(object):
         self._game_order = []
         self.current_index = 0
 
-    def register_user(self, user_id, name):
-        if self.state == ClueGame.Status.Init:
-            self._users[user_id] = ClueGame.User(user_id, name)
-            return ClueGame.Status.OK
-        return self.state
+        self._lock = Lock()
 
-    def start_game(self):
-        if self.state != ClueGame.Status.Init:
+        self._guess_lock = Lock()
+        self._user_gussing = None
+        self._start_guessing = None
+
+    def start_guess(self, user_id):
+        with self._guess_lock:
+            print(user_id, self._user_gussing, time() - self._start_guessing if self._start_guessing else 0)
+            if self._user_gussing is None:
+                self._user_gussing = user_id
+                self._start_guessing = time()
+                return True
+            if self._user_gussing == user_id:
+                self._start_guessing = time()
+                return True
+            if time() - self._start_guessing > GUESS_TIMEOUT_TIME:
+                self._user_gussing = user_id
+                self._start_guessing = time()
+                return True
+
+            return False
+
+    def cont_guess(self, user_id):
+        print(user_id, self._user_gussing, time() - self._start_guessing if self._start_guessing else 0)
+
+        with self._guess_lock:
+            if self._user_gussing is None:
+                return False
+            if self._user_gussing == user_id:
+                self._start_guessing = time()
+                return True
+            return False
+
+    def end_guess(self, user_id):
+        print(user_id, self._user_gussing, time() - self._start_guessing if self._start_guessing else 0)
+
+        with self._guess_lock:
+            if self._user_gussing is not None and self._user_gussing == user_id:
+                self._user_gussing = None
+                self._start_guessing = None
+                print("Guess RESET")
+                return True
+            return False
+
+    def register_user(self, user_id, name):
+        with self._lock:
+            if self.state == ClueGame.Status.Init:
+                self._users[user_id] = ClueGame.User(user_id, name, self)
+                return ClueGame.Status.OK
             return self.state
 
-        # For now, I do not necceserly wants the list of suspects to overlap list of users.
-        # self._suspects = [str(self._users[k]) for k in self._users.keys()]
-        self._suspects = self._default_suspects
-        print(self._tools)
+    def start_game(self):
+        with self._lock:
+            if self.state != ClueGame.Status.Init:
+                return self.state
 
-        self._murder_info = (random.choice(self._tools), random.choice(self._rooms), random.choice(self._suspects))
-        self._deck = []
+            # For now, I do not necceserly wants the list of suspects to overlap list of users.
+            # self._suspects = [str(self._users[k]) for k in self._users.keys()]
+            self._suspects = self._default_suspects
+            print(self._tools)
 
-        self._deck.extend([t for t in self._tools if t != self._murder_info[0]])
-        self._deck.extend([t for t in self._rooms if t != self._murder_info[1]])
-        self._deck.extend([t for t in self._suspects if t != self._murder_info[2]])
+            self._murder_info = (random.choice(self._tools), random.choice(self._rooms), random.choice(self._suspects))
+            self._deck = []
 
-        random.shuffle(self._deck)
-        cards_per_user = len(self._deck) // len(self._users)
-        extra_cards = len(self._deck) % len(self._users)
-        print(cards_per_user, extra_cards, len(self._users))
-        deck_index = 0
-        for i, (_, u) in enumerate(self._users.items()):
-            extra_card = 1 if extra_cards > i else 0
-            deck_offset = deck_index + cards_per_user + extra_card
-            print(deck_offset - deck_index)
-            u.set_deck(self._deck[deck_index:deck_offset])
-            deck_index = deck_offset
+            self._deck.extend([t for t in self._tools if t != self._murder_info[0]])
+            self._deck.extend([t for t in self._rooms if t != self._murder_info[1]])
+            self._deck.extend([t for t in self._suspects if t != self._murder_info[2]])
 
-        self._game_order = list(self._users.keys())
-        random.shuffle(self._game_order)
-        self.current_index = 0
+            random.shuffle(self._deck)
+            cards_per_user = len(self._deck) // len(self._users)
+            extra_cards = len(self._deck) % len(self._users)
+            print(cards_per_user, extra_cards, len(self._users))
+            deck_index = 0
+            for i, (_, u) in enumerate(self._users.items()):
+                extra_card = 1 if extra_cards > i else 0
+                deck_offset = deck_index + cards_per_user + extra_card
+                print(deck_offset - deck_index)
+                u.set_deck(self._deck[deck_index:deck_offset])
+                deck_index = deck_offset
 
-        self.state = ClueGame.Status.Running
+            self._game_order = list(self._users.keys())
+            random.shuffle(self._game_order)
+            self.current_index = 0
 
-        return self.Status.OK
+            self.state = ClueGame.Status.Running
+
+            return self.Status.OK
 
     def accuse(self, suspect, tool, room):
         if (tool, room, suspect) == self._murder_info:
