@@ -14,6 +14,7 @@ from bot_token import bot_token
 import logging
 import os
 
+import clue
 from clue import ClueGame
 import cards
 
@@ -24,11 +25,11 @@ from functools import wraps
 games = {}
 user_to_game = {}
 
+dispatcher = None
 
 def group_only(func):
     @wraps(func)
     def wrapped(bot, update, *args, **kwargs):
-        print("group_only")
         user_id = update.effective_user.id
         chat_id = update.message.chat_id
 
@@ -220,7 +221,7 @@ def guess_or_accuse(game, user_id, bot, update):
     if not game.start_guess(user_id):
         update.message.reply_text("You can't guess now. Someone else is guessing.")
         game.get_user(user_id).cancel_guess()
-        return
+        return ConversationHandler.END
 
     reply_keyboard = [['Suggest', "Accuse"], ["Cancel"]]
     markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
@@ -243,7 +244,7 @@ def list_to_list_set(l):
 def guess_suspect(game, user_id, bot, update, user_data):
     if not game.cont_guess(user_id):
         update.message.reply_text("You can't guess now. Guessing took too long?.")
-        return
+        return guess_cancel(bot, update, user_data)
 
     text = update.message.text
     if text == "Cancel":
@@ -264,7 +265,7 @@ def guess_suspect(game, user_id, bot, update, user_data):
 def guess_tool(game, user_id, bot, update, user_data):
     if not game.cont_guess(user_id):
         update.message.reply_text("You can't guess now. Guessing took too long?.")
-        return
+        return guess_cancel(bot, update, user_data)
 
     text = update.message.text
     if text == "Cancel":
@@ -286,7 +287,7 @@ def guess_tool(game, user_id, bot, update, user_data):
 def guess_room(game, user_id, bot, update, user_data):
     if not game.cont_guess(user_id):
         update.message.reply_text("You can't guess now. Guessing took too long?.")
-        return
+        return guess_cancel(bot, update, user_data)
 
     text = update.message.text
     if text == "Cancel":
@@ -306,9 +307,10 @@ def guess_room(game, user_id, bot, update, user_data):
 
 @user_only
 def guess_final(game, user_id, bot, update, user_data):
+    global dispatcher
     if not game.cont_guess(user_id):
         update.message.reply_text("You can't guess now. Guessing took too long?.")
-        return
+        return guess_cancel(bot, update, user_data)
 
     text = update.message.text
     if text == "Cancel":
@@ -419,6 +421,7 @@ def get_help(game, user_id, bot, update):
 
 
 def set_dispatchr(server_updater):
+    global dispatcher
     dispatcher = server_updater.dispatcher
 
     dispatcher.add_handler(CommandHandler('test', test))
@@ -444,7 +447,8 @@ def set_dispatchr(server_updater):
             ChooseState.ROOM: [MessageHandler(Filters.text, guess_room, pass_user_data=True)],
             ChooseState.FINAL: [MessageHandler(Filters.text, guess_final, pass_user_data=True)]
         },
-        fallbacks=[RegexHandler('^Cancel$', guess_cancel, pass_user_data=True)]
+        fallbacks=[RegexHandler('^Cancel$', guess_cancel, pass_user_data=True)],
+        conversation_timeout=clue.GUESS_TIMEOUT_TIME_S
     )
     dispatcher.add_handler(conv_handler)
 

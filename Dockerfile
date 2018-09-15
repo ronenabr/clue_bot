@@ -1,6 +1,7 @@
 FROM python:3
 
-RUN git clone https://github.com/ronenabr/clue_bot.git && \
+RUN export LC_ALL=C
+
     cd clue_bot && \
     pip install -r requiremnts.txt
 

@@ -18,8 +18,8 @@ TOOLS = ["GARNERA",
 
 SUSPECTS = ["Ronen", "Oded", "Fox", "Frorixh"]
 
-NUMBER_OF_SECONDS_BETWEEN_TURNS = 0.1 * 60
-GUESS_TIMEOUT_TIME = 0.1*60;
+NUMBER_OF_SECONDS_BETWEEN_TURNS = 0.5 * 60
+GUESS_TIMEOUT_TIME_S = 1 * 60;
 
 class ClueGame(object):
     class Status(Enum):
@@ -117,7 +117,7 @@ class ClueGame(object):
 
     def start_guess(self, user_id):
         with self._guess_lock:
-            print(user_id, self._user_gussing, time() - self._start_guessing if self._start_guessing else 0)
+            print("Start guessing", user_id, self._user_gussing, time() - self._start_guessing if self._start_guessing else 0)
             if self._user_gussing is None:
                 self._user_gussing = user_id
                 self._start_guessing = time()
@@ -125,7 +125,7 @@ class ClueGame(object):
             if self._user_gussing == user_id:
                 self._start_guessing = time()
                 return True
-            if time() - self._start_guessing > GUESS_TIMEOUT_TIME:
+            if time() - self._start_guessing > GUESS_TIMEOUT_TIME_S:
                 self._user_gussing = user_id
                 self._start_guessing = time()
                 return True
