@@ -5,10 +5,10 @@
 - {file: /Users/rabravanel/gits/clue_bot/images/rooms/living_room.jpg, file_id: AgADBAADL68xG6M0iVFqEH9A39MMsrVWkRoABHKZ7s2m5VvrbTsDAAEC,
   name: living_room, type: 2}
 - {file: /Users/rabravanel/gits/clue_bot/images/rooms/Kids_room.jpg, file_id: AgADBAADMK8xG6M0iVExLqVN-9EFbjhymhoABO87Snh0nSg2144CAAEC,
-  name: Kids_room, type: 2}
+  name: kids_room, type: 2}
 - {file: /Users/rabravanel/gits/clue_bot/images/rooms/Office.jpg, file_id: AgADBAADMa8xG6M0iVH1IlbWDJdtzpShoBoABPmHUoyM4w9RgYAAAgI,
-  name: Office, type: 2}
+  name: office, type: 2}
 - {file: /Users/rabravanel/gits/clue_bot/images/rooms/Kitchen.jpg, file_id: AgADBAADMq8xG6M0iVGc8cfBGKA1iXZWoBoABAziU4BZgCVW240CAAEC,
-  name: Kitchen, type: 2}
+  name: kitchen, type: 2}
 - {file: /Users/rabravanel/gits/clue_bot/images/rooms/closets.jpg, file_id: AgADBAADM68xG6M0iVGCYqUAAU8GN308oqAaAASp8Kx0nZ3QA1Z_AAIC,
   name: closets, type: 2}
