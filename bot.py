@@ -145,14 +145,13 @@ instruction_text = """
 How to play?
 ========
 
-All the commands should be send to me, your lovely bot privately.   You can ask me...
+All the commands should be send to me, your lovely bot, privately.  You can ask me...
 
- • Type `/cards`  to see the cards your are holding
- • If you will ask me for `/suspects`, I'll remind you who was here while the murder was committed.
- • Ask for  `/weapons` to see which items we found around here. 
- what different rooms we have in our house.
+ • Type `/cards` to see the cards your are holding.
+ • If you ask me for `/suspects`, I'll remind you who was around when the murder was committed.
+ • Ask for `/weapons` to see which lethal items we found around here. 
  • And finally, I can list for you the `/rooms` we have around here. 
- • If you think you know Who, Where and with what the murder was done, you can always `/guess`.
+ • If you think you know Who, Where, and with What the murder was performed, you can always `/guess`.
  • And finally, I can remind you these instructions if you ask for `/help`. 
 
 """
@@ -163,8 +162,8 @@ All the commands should be send to me, your lovely bot privately.   You can ask 
 def make_murder(game, bot, update):
     game.start_game()
 
-    text1 = "Someone commited a murder! Alas! \nHe used one of the following tools: \n\t\t%s "
-    text2 = "It was in room:  \n\t\t%s"
+    text1 = "Someone has commited a murder! Alas! \nHe used one of the following tools: \n\t\t%s "
+    text2 = "It happened in one of these rooms:  \n\t\t%s"
     text3 = "And the murdrer might be... \n\t\t%s"
 
     bot.send_message(chat_id=update.message.chat_id, text=text1 % "\n\t\t".join(map(str, game._tools)))
@@ -176,7 +175,7 @@ def make_murder(game, bot, update):
     bot.send_message(chat_id=update.message.chat_id, text=instruction_text)
     bot.send_message(chat_id=update.message.chat_id,
                      text="You can address me at %s. \nPlease ask me for /cards now."
-                          "(Privately. You don't won't everybody to see) " % bot.name)
+                          " (Privately. You don't want everyone to see) " % bot.name)
 
 
 @user_only
@@ -255,7 +254,7 @@ def guess_suspect(game, user_id, bot, update, user_data):
     markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
 
     update.message.reply_text(
-        "Please choose the murderer",
+        "Please choose the Murderer",
         reply_markup=markup)
 
     return ChooseState.TOOL
@@ -277,7 +276,7 @@ def guess_tool(game, user_id, bot, update, user_data):
     markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
 
     update.message.reply_text(
-        "Please choose the murder weapon",
+        "Please choose the murder WEAPON",
         reply_markup=markup)
 
     return ChooseState.ROOM
@@ -405,7 +404,7 @@ def show_me_suspecs(game, user_id, bot, update):
 
 @user_only
 def show_me_tools(game, user_id, bot, update):
-    bot.send_message(chat_id=user_id, text="Possible weapons are \n")
+    bot.send_message(chat_id=user_id, text="Possible WEAPONS are \n")
     for c in game._tools:
         send_card(bot, user_id, c)
 
